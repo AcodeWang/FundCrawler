@@ -8,20 +8,26 @@ var fs = require('fs');
 
 const app = new koa()
 
-const urls = ["501050","501029","100032","001052","001051"]
-
-
 app.use(async (ctx, next)=>{
   await next()
   ctx.response.type = 'text/html'
   ctx.response.body = '<h1> Hello KOA2!<h1>'
 })
 
-let data = [];
+var workbook = XLSX.readFile('./fund.xlsx')
+
+var today = new Date()
+console.log(today)
+var formatedDate =  (today.getDate()-1) + "/" + (today.getMonth() + 1) + "/" + today.getFullYear()
+console.log(formatedDate)
+
+const urls = ["501050","501029","100032","001052","001051"]
+let fundObjs = [];
 
 urls.forEach( fundID => {
 
-    url = "https://xueqiu.com/S/F" + fundID
+    // url = "https://xueqiu.com/S/F" + fundID
+    url = "http://fund.eastmoney.com/" + fundID + ".html"
     superagent.get(url).end(function (err, res) {
         // 抛错拦截
          if(err){
@@ -44,47 +50,47 @@ urls.forEach( fundID => {
 
        // console.log($)
 
-       var items = [];
-       $('#app .stock-current').each(function (index, element) {
+       // $('#app .stock-current').each(function (index, element) {
+       $('#body .dataItem02').each(function (index, element) {
+         var temp = $(element).find('.dataNums').text().split('-')[0]
+         console.log(fundID)
+         console.log(temp)
 
-         var temp = $(element).text()
-         // console.log(fundID)
-         // console.log(temp)
-         data.push({
+         fundObjs.push({
            id : fundID,
+           date: formatedDate,
            price : temp
          })
 
-         if(data.length == urls.length){
-           console.log(data)
-           objectToXLSX(data)
+         var fundObj = {
+           date: formatedDate,
+           price : temp
          }
+
+         // console.log(fundObj);
+         objectToXLSX(fundID, fundObj);
        });
 
+       XLSX.writeFile(workbook, 'out.xlsx');
        console.log('--------')
     });
 })
 
-function objectToXLSX(json){
-  var workbook = XLSX.readFile('./out.xlsx')
+function objectToXLSX(fundID, fund){
 
-  var first_sheet_name = workbook.SheetNames[0]
+  var worksheet = workbook.Sheets[fundID]
 
-  var worksheet = workbook.Sheets[first_sheet_name]
+  XLSX.utils.sheet_add_json(worksheet, [fund], {header:["date","price"],origin:-1, skipHeader : true})
 
-  var range = XLSX.utils.decode_range(worksheet['!ref']);
-  var num_rows = range.e.r - range.s.r + 1
-  var num_cols = range.e.r - range.s.r + 1
+  var todayPrice = worksheet['B1']
+  todayPrice.v = fund.price
 
-  console.log("cols : " + num_cols)
-  console.log("rows : " + num_rows)
-
-  var newSheetName = "newSheetName"
-
-  // XLSX.utils.sheet_add_json(worksheet, json, {skipHeader: false, origin: -1});
-
-  XLSX.writeFile(workbook, 'out.xlsx');
+  console.log(fund);
+  console.log("ok");
 }
+
+// objectToXLSX("100032", {"date":formatedDate, "price": "1,11"})
+// XLSX.writeFile(workbook, 'out.xlsx');
 
 app.listen(3000)
 console.log('start port 3000')
